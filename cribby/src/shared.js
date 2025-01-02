@@ -1,10 +1,10 @@
+import combinations from "./combinations.js";
+
 export const Card = class {
     constructor(suit, number) {
         this.suit = suit;
         this.number = number;
-    
     }
-
 }
 
 const shuffleArray = array => {
@@ -17,23 +17,87 @@ const shuffleArray = array => {
   }
 
 export const SUITS = ["H", "D", "S", "C"]
-export function createDeck() {
-    const result = []
-    for (let i =0; i < SUITS.length; i++) {
-        for (let j = 0; j < 13; j++){
-            result.push(new Card(SUITS[i], j+1))
+
+export const Deck = class {
+    constructor() {
+        const result = []
+        for (let i =0; i < SUITS.length; i++) {
+            for (let j = 0; j < 13; j++){
+                result.push(new Card(SUITS[i], j+1))
+            }
         }
+    
+        this.cards = result;
     }
 
-    shuffleArray(result);
-    return result;
+    deal(handSize) {
+        const hand = []
+        shuffleArray(this.cards);
+
+        for(let j = 0; j< handSize; j++) {
+            hand.push(this.cards.pop());
+        }
+        return hand;
+    }
 }
 
-
+function containsCard(cards, card) {
+    for(const c of cards) {
+        if (c.number === card.number && c.suit === card.suit) {
+            return true;
+        }
+    }
+    return false
+}
 
 export const Hand = class {
     constructor(cards) {
         this.cards = cards;
+    }
+
+
+    discard() {
+        const d = new Deck();
+
+        let keepScores = [];
+        for(const rump of combinations(this.cards, 4)) {
+            let total = 0
+            let cardCount = 0
+
+            let scoringHands = []
+            let baseScore = score(rump)
+            for(const revealed of d.cards) {
+                if(containsCard(this.cards, revealed)) {
+                    continue;
+                }
+                const incScore = score([...rump, revealed])
+
+                if (incScore > baseScore) {
+                    scoringHands.push([revealed, incScore])
+                //     console.log(incScore)
+                //     // console.log(incScore, [...rump, revealed])
+                }
+                total += incScore
+                cardCount += 1
+            }
+            keepScores.push([rump, total / cardCount, scoringHands])
+        }
+        keepScores = keepScores.sort(function (a, b) {
+            // console.log(a[1])
+            return b[1] - a[1]
+        })
+        console.log(keepScores[0][1], keepScores[0][0])
+        console.log(keepScores[1][1], keepScores[1][0])
+
+        // console.log(keepScores[0][1], keepScores[0][0], keepScores[0][2])
+        // console.log(keepScores[1][1], keepScores[1][0], keepScores[1][2])
+
+        for(let i = this.cards.length - 1; i>=0; i--) {
+            if(!containsCard(keepScores[0][0], this.cards[i])) {
+                this.cards.splice(i, 1);
+            }
+        }
+
     }
 }
 
@@ -41,95 +105,18 @@ export const Hands = class {
     constructor(playerCount) {
         const hands = []
         const cardCount = 4;
-        const deck = createDeck();
+        const deck = new Deck();
 
         for(let i = 0; i< playerCount; i++) {
-            const playerHand = []
-            for(let j = 0; j< cardCount; j++) {
-                playerHand.push(deck.pop());
-
-            }
+            const playerHand = deck.deal(cardCount)
+    
             hands.push(new Hand(playerHand));
         }
         this.hands = hands;
     }
+
 }
 
-function addIndices(items, indices) {
-    // console.log("adding", indices);
-    const result = [];
-    for(let i = 0; i< indices.length; i++) {
-        result.push(items[indices[i]])
-    }
-    return result;
-}
-
-function findIndexToChange(indices, size,n) {
-    for(let i = size-1; i>=0; i--) {
-        // console.log("checking", i, indices[i] , i + n - size)
-        if (indices[i] != i + n - size) {
-            return i
-        // } else {
-            // return null;
-        }
-    }
-    return null;
-}
-function* combinations(items, size) {
-    // 0123 ==> 012 013 023 123
-    // def combinations(iterable, r):
-    // pool = tuple(iterable)
-    // n = len(pool)
-    // if r > n:
-    //     return
-    // indices = list(range(r))
-    // yield tuple(pool[i] for i in indices)
-    // n = 4
-    // r = 3
-    // [0,1,2]
-    // [0,1,3]
-    // 
-    // while True:
-    //     for i in reversed(range(r)): [2,1,0]
-    //         if indices[i] != i + n - r:
-    //             break
-    //     else:
-    //         return
-    //     indices[i] += 1
-    //     for j in range(i+1, r):
-    //         indices[j] = indices[j-1] + 1
-    //     yield tuple(pool[i] for i in indices)
-
-    const results = []
-    const indices = []
-    const n = items.length;
-    for (let i = 0; i< size; i++) {
-        indices.push(i)
-    }
-    yield addIndices(items, indices);
-
-    // console.log("indices", indices);
-    while(true) {
-        // console.log()
-        let indexToChange = findIndexToChange(indices, size, n)
-        
-        // console.log("indexToChange", indexToChange);
-        if (indexToChange === null) {
-            return;
-        }
-        indices[indexToChange] += 1;
-        for (let j = indexToChange + 1; j < size; j++) {
-            indices[j] = indices[j-1] + 1;
-        }
-        yield addIndices(items, indices);
-        // return;
-    }
-    // results.push(items.slice(0,size));
-    // for(let i = 0; i<size; i++){
-
-    // }
-    return;
-}
 
 function scoreFifteen(cards) {
     const sum = cards.reduce(
@@ -195,30 +182,48 @@ export function score(cards) {
 }
 
 
-// let hand = new Hands(2);
+function findBestHand() {
+    const deck = createDeck();
+    let scores = []
 
-// console.log(score(hand.hands[0].cards));
-
-const deck = createDeck();
-let scores = []
-
-let count = 0;
-for (const hand of combinations(deck, 6)){
-    count +=1;
-    let s = score(hand);
-    if (s > 10){
-        scores.push([hand, s])
+    let count = 0;
+    for (const hand of combinations(deck, 5)){
+        count +=1;
+        let s = score(hand);
+        if (s > 10){
+            scores.push([hand, s])
+        }
+        if (count % 1000000 === 0) {
+            console.log(`... ${count}`)
+        }
     }
-    if (count % 1000000 === 0) {
-        console.log(`... ${count}`)
-    }
+    console.log("count:", count)
+    scores = scores.sort(function (a, b) {
+        // console.log(a[1])
+        return b[1] - a[1]
+    })
+    // console.log("hands", hands.length)
+    // console.log(scores)
+    // console.log(scores[0][1],scores[0][0])
+    console.log(scores[0][1], scores[0][0])
 }
-console.log("count:", count)
-scores = scores.sort(function (a, b) {
-    // console.log(a[1])
-    return b[1] - a[1]
-})
-// console.log("hands", hands.length)
-// console.log(scores)
-// console.log(scores[0][1],scores[0][0])
-console.log(scores[0][1], scores[0][0])
+
+let deck = new Deck();
+let hand = new Hand(deck.deal(6))
+// console.log(hand)
+// hand.discard();
+// console.log(score(hand.cards))
+
+// let hand = new Hand([
+//           new Card('C',1 ),
+//           new Card('D',1 ),
+//           new Card('D', 4 ),
+//           new Card('S', 6 ),
+//           new Card('D', 6 ),
+//           new Card('S',8 )
+// ])
+
+console.log(hand.cards);
+hand.discard();
+
+console.log(hand.cards);
